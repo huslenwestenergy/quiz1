@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Өдөр тутмын Quiz</title>
+<style>
+:root{--bg:#f3f6f2;--card:#fff;--ink:#16302b;--mute:#5d746e;--line:#d5e0db;--ok:#1f8a5b;--okbg:#dcf3e8;--bad:#c2410c;--badbg:#fde6da;--acc:#14532d;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1b18;--card:#172622;--ink:#e6f1ed;--mute:#93aca5;--line:#27403a;--okbg:#14382a;--badbg:#42200f;--acc:#6ee7a8;--ok:#4ade80;--bad:#fb923c}}
+:root[data-theme="dark"]{--bg:#0f1b18;--card:#172622;--ink:#e6f1ed;--mute:#93aca5;--line:#27403a;--okbg:#14382a;--badbg:#42200f;--acc:#6ee7a8;--ok:#4ade80;--bad:#fb923c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,Arial,sans-serif;min-height:100vh}
+main{max-width:620px;margin:0 auto;padding:20px 16px 40px}
+.stats{display:flex;gap:10px;margin-bottom:18px}
+.stat{flex:1;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.stat b{display:block;font-size:22px;color:var(--acc)}
+.stat span{font-size:13px;color:var(--mute)}
+.cat{font-size:14px;color:var(--mute);margin-bottom:6px}
+h1{font-size:24px;line-height:1.35;margin:0 0 18px}
+.opt{display:block;width:100%;text-align:left;font:inherit;font-size:17px;color:var(--ink);background:var(--card);border:2px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer}
+.opt:hover:not(:disabled){border-color:var(--acc)}
+.opt:focus-visible,.next:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.opt.ok{background:var(--okbg);border-color:var(--ok)}
+.opt.bad{background:var(--badbg);border-color:var(--bad)}
+.opt:disabled{cursor:default}
+.msg{min-height:26px;margin:6px 0 12px;font-weight:600}
+.msg.ok{color:var(--ok)}.msg.bad{color:var(--bad)}
+.next{font:inherit;font-weight:600;font-size:17px;background:var(--acc);color:var(--bg);border:0;border-radius:12px;padding:14px 22px;width:100%;cursor:pointer}
+.next[hidden]{display:none}
+.reset{background:none;border:0;color:var(--mute);font:inherit;font-size:13px;text-decoration:underline;cursor:pointer;margin-top:22px}
+</style>
+</head>
+<body>
+<main>
+  <div class="stats">
+    <div class="stat"><b id="sc">0</b><span>Зөв</span></div>
+    <div class="stat"><b id="st">0</b><span>Дараалсан</span></div>
+    <div class="stat"><b id="best">0</b><span>Дээд дараалал</span></div>
+    <div class="stat"><b id="td">0</b><span>Өнөөдөр</span></div>
+  </div>
+  <div class="cat" id="cat"></div>
+  <h1 id="q"></h1>
+  <div id="opts"></div>
+  <div class="msg" id="msg" aria-live="polite"></div>
+  <button class="next" id="next" hidden>Дараагийн асуулт</button>
+  <button class="reset" id="reset">Оноог арилгах</button>
+</main>
+<script>
+// Асуултын сан: энд шинэ асуулт нэмнэ. [ангилал, асуулт, [хариултууд], зөв хариултын индекс]
+const BANK=[
+["Газар зүй","Монгол Улсын нийслэл аль нь вэ?",["Дархан","Улаанбаатар","Эрдэнэт","Чойбалсан"],1],
+["Газар зүй","Монголын хамгийн том нуур аль нь вэ?",["Хөвсгөл","Увс","Хяргас","Бүрэнхаан"],1],
+["Газар зүй","Монголын хамгийн өндөр оргил?",["Хүйтэн","Отгонтэнгэр","Мөнххайрхан","Бургас"],0],
+["Газар зүй","Дэлхийн хамгийн урт гол?",["Амазон","Нил","Янцзы","Меконг"],1],
+["Газар зүй","Хамгийн олон хүн амтай тив?",["Африк","Европ","Ази","Өмнөд Америк"],2],
+["Түүх","Их Монгол Улсыг үндэслэгч хэн бэ?",["Хубилай","Чингис хаан","Өгэдэй","Мөнх хаан"],1],
+["Түүх","Монгол Улс ардын хувьсгал хэдэн онд ялсан бэ?",["1911","1921","1945","1990"],1],
+["Түүх","Эртний Египтийн пирамидууд ямар зорилгоор барьсан бэ?",["Тариа хадгалах","Фараонуудын булш","Цайз","Сургууль"],1],
+["Шинжлэх ухаан","Усны химийн томьёо?",["CO2","H2O","O2","NaCl"],1],
+["Шинжлэх ухаан","Нарны аймгийн хамгийн том гараг?",["Санчир","Сугар","Бархасбадь","Ангараг"],2],
+["Шинжлэх ухаан","Ургамал фотосинтезээр юуг шингээдэг вэ?",["Хүчилтөрөгч","Нүүрсхүчлийн хий","Азот","Устөрөгч"],1],
+["Шинжлэх ухаан","Хүний биед хэдэн яс байдаг вэ (насанд хүрэгчид)?",["106","206","306","406"],1],
+["Шинжлэх ухаан","Гэрлийн хурд ойролцоогоор хэд вэ?",["300 км/с","3 000 км/с","300 000 км/с","3 сая км/с"],2],
+["Математик","7 × 8 = ?",["54","56","58","64"],1],
+["Математик","144-ийн квадрат язгуур?",["10","11","12","14"],2],
+["Математик","Тойргийн π-ийн ойролцоо утга?",["2.14","3.14","4.13","3.41"],1],
+["Технологи","HTML-ийн бүтэн нэр?",["HyperText Markup Language","High Tech Modern Language","Home Tool Markup Level","Hyper Transfer Mode Link"],0],
+["Технологи","Вэб хөтөч биш аль нь вэ?",["Chrome","Firefox","Excel","Safari"],2],
+["Англи хэл","\"Apple\" гэдэг үгийн орчуулга?",["Алим","Лийр","Усан үзэм","Чавга"],0],
+["Англи хэл","\"Book\" гэдэг үгийн орчуулга?",["Үзэг","Ном","Дэвтэр","Сурагч"],1],
+["Соёл","Монголын үндэсний баяр наадам хэдэн төрлийн бэлгийн өрсөлдөөнтэй вэ?",["2","3","4","5"],1],
+["Соёл","Морин хуур хэдэн чавхдастай вэ?",["1","2","3","4"],1],
+["Спорт","Хөл бөмбөгийн багт талбай дээр хэдэн тоглогч байдаг вэ?",["9","10","11","12"],2],
+["Спорт","Олимпийн наадам хэдэн жил тутамд болдог вэ?",["2","3","4","5"],2]
+];
+const $=id=>document.getElementById(id);
+let S={score:0,streak:0,best:0,day:new Date().toDateString(),today:0,recent:[]};
+try{const r=localStorage.getItem("quiz_state");if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+if(S.day!==new Date().toDateString()){S.day=new Date().toDateString();S.today=0}
+function save(){try{localStorage.setItem("quiz_state",JSON.stringify(S))}catch(e){}}
+function stats(){$("sc").textContent=S.score;$("st").textContent=S.streak;$("best").textContent=S.best;$("td").textContent=S.today}
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+let cur;
+function pick(){
+  // сүүлд гарсан асуултыг давтахгүй, сан дуусвал дахин эхэлнэ
+  const keep=Math.min(S.recent.length,BANK.length-1);
+  const pool=BANK.map((_,i)=>i).filter(i=>!S.recent.slice(-keep).includes(i));
+  const idx=pool[Math.floor(Math.random()*pool.length)];
+  S.recent.push(idx);if(S.recent.length>BANK.length)S.recent.shift();
+  return idx;
+}
+function show(){
+  const [cat,q,opts,ans]=BANK[pick()];
+  const order=shuffle(opts.map((t,i)=>({t,ok:i===ans})));
+  cur=order;
+  $("cat").textContent=cat;$("q").textContent=q;$("msg").textContent="";$("msg").className="msg";
+  $("next").hidden=true;
+  const box=$("opts");box.innerHTML="";
+  order.forEach((o,i)=>{
+    const b=document.createElement("button");b.className="opt";b.textContent=o.t;
+    b.onclick=()=>answer(i);box.appendChild(b);
+  });
+  stats();save();
+}
+function answer(i){
+  const btns=[...document.querySelectorAll(".opt")];
+  btns.forEach((b,k)=>{b.disabled=true;if(cur[k].ok)b.classList.add("ok")});
+  const m=$("msg");
+  S.today++;
+  if(cur[i].ok){S.score++;S.streak++;S.best=Math.max(S.best,S.streak);m.textContent="Зөв байна!";m.className="msg ok"}
+  else{S.streak=0;btns[i].classList.add("bad");m.textContent="Буруу. Зөв хариулт тодорсон байна.";m.className="msg bad"}
+  stats();save();
+  $("next").hidden=false;$("next").focus();
+}
+$("next").onclick=show;
+$("reset").onclick=()=>{S.score=0;S.streak=0;S.best=0;S.today=0;save();stats()};
+show();
+</script>
+</body>
+</html>
